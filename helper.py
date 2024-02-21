@@ -1,5 +1,7 @@
 import csv
 
+import numpy as np
+
 
 class Helper:
     @staticmethod
@@ -47,3 +49,8 @@ class Helper:
                         trial_choices[step_string] = Helper.format_obs_static(1, choice)
                 trials.append(trial_choices)
         return trials
+
+    @staticmethod
+    def softmax(x, temperature):  # could be unstable if temperature is too low (1e-3)
+        x = np.array(x)
+        return np.exp(x / temperature) / np.exp(x / temperature).sum()

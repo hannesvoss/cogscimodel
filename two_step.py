@@ -19,6 +19,9 @@ class TwoStep:
         reward, done = None, False
         return self.format_obs(self._dataset.trials[self._trial_num]["stepOne_Param"]), reward, done
 
+    def reset_trials(self):
+        self._trial_num = 0
+
     # prepend color to token index (g for first step, p for second step)
     def format_obs(self, obs, step=None):
         return Helper.format_obs_static(step if step else self._step, obs)

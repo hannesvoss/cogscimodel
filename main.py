@@ -49,7 +49,8 @@ if __name__ == '__main__':
 
     first_stage_choice, second_stage_choice = None, None
     for _ in range(episodes):
-        transition_count = {'g0-b': 0, 'g1-b': 0, 'g0-p': 0, 'g1-p': 0}
+        tdlr_modelbased.environment.reset_trials()
+        transition_count = {'g0-g': 0, 'g1-g': 0, 'g0-p': 0, 'g1-p': 0}
         first_stage_count = {'g0': 0, 'g1': 0}
         while tdlr_modelbased.environment.has_more_trials():
             obs, reward, done = tdlr_modelbased.environment.reset()
@@ -59,23 +60,15 @@ if __name__ == '__main__':
                 if action[0] == 'g':
                     first_stage_choice = action
                     tdlr_trials[-1]["stepOneChoice"] = action
-                    print(f"First stage choice: {first_stage_choice}")
-                    first_stage_count[first_stage_choice] += 1
                 elif action[0] == 'p':
                     second_stage_choice = action
                     tdlr_trials[-1]["stepTwoChoice"] = action
-                    print(f"Second stage choice: {second_stage_choice}")
-                transition_count[f"{first_stage_choice}-b"] += 1 if second_stage_choice[:-1] == 'b' else 0
-                transition_count[f"{first_stage_choice}-p"] += 1 if second_stage_choice[:-1] == 'p' else 0
                 obs, reward, done = tdlr_modelbased.environment.step(action)
+                first_stage_count[first_stage_choice] += 1
+            transition_count[f"{first_stage_choice}-g"] += 1 if second_stage_choice[:-1] == 'g' else 0
+            transition_count[f"{first_stage_choice}-p"] += 1 if second_stage_choice[:-1] == 'p' else 0
             tdlr_modelbased.update(first_stage_choice, second_stage_choice, reward)
-
-        print(first_stage_count['g1'])
-        print(transition_count['g1-b'])
-        tdlr_modelbased.transition_probabilities['g1-b'] = transition_count['g1-b'] / first_stage_count['g1']
-        tdlr_modelbased.transition_probabilities['g1-p'] = transition_count['g1-p'] / first_stage_count['g1']
-        tdlr_modelbased.transition_probabilities['g2-b'] = transition_count['g2-b'] / first_stage_count['g2']
-        tdlr_modelbased.transition_probabilities['g2-p'] = transition_count['g2-p'] / first_stage_count['g2']
+        tdlr_modelbased.update_transition_probabilities(transition_count, first_stage_count)
 
     # -------------- Parameter Fitting ----------------
 
@@ -93,17 +86,21 @@ if __name__ == '__main__':
         return log_likelihood
 
 
-    def run_parameter_fitting():
+    def run_parameter_fitting_tdlr():
         # compare log_likelihood for different parameter values
         alphas = np.arange(0, 1, 0.05)
         gammas = np.arange(0, 1, 0.05)
         temperatures = [0.0025, 0.05, 0.1, 1, 10]
+
+        episodes = 10
 
         models = [
             TDLR,
             TDLRModelBased,
         ]
         for modeltype in models:
+            print(f"--" * 20)
+            print(f"Running parameter fitting for {modeltype.__name__}")
             for csv_filename in csv_filenames:
                 user_trials = Helper.get_user_choices_from_csv(csv_filename)
                 print(f"--" * 20)
@@ -124,21 +121,45 @@ if __name__ == '__main__':
                             trials = []
 
                             first_stage_choice, second_stage_choice = None, None
-                            while model.environment.has_more_trials():
-                                obs, reward, done = model.environment.reset()
-                                trials.append({})
-                                while not done:
-                                    action = model.choose_action(obs)
-                                    if action[0] == 'g':
-                                        first_stage_choice = action
-                                        trials[-1]["stepOneChoice"] = action
-                                    elif action[0] == 'p':
-                                        second_stage_choice = action
-                                        trials[-1]["stepTwoChoice"] = action
-                                    obs, reward, done = model.environment.step(action)
-                                model.update(first_stage_choice, second_stage_choice, reward)
+                            if modeltype == TDLR:
+                                while model.environment.has_more_trials():
+                                    obs, reward, done = model.environment.reset()
+                                    trials.append({})
+                                    while not done:
+                                        action = model.choose_action(obs)
+                                        if action[0] == 'g':
+                                            first_stage_choice = action
+                                            trials[-1]["stepOneChoice"] = action
+                                        elif action[0] == 'p':
+                                            second_stage_choice = action
+                                            trials[-1]["stepTwoChoice"] = action
+                                        obs, reward, done = model.environment.step(action)
+                                    model.update(first_stage_choice, second_stage_choice, reward)
+                            elif modeltype == TDLRModelBased:
+                                for _ in range(episodes):
+                                    model.environment.reset_trials()
+                                    transition_count = {'g0-g': 0, 'g1-g': 0, 'g0-p': 0, 'g1-p': 0}
+                                    first_stage_count = {'g0': 0, 'g1': 0}
+                                    while model.environment.has_more_trials():
+                                        obs, reward, done = model.environment.reset()
+                                        trials.append({})
+                                        while not done:
+                                            action = model.choose_action(obs)
+                                            if action[0] == 'g':
+                                                first_stage_choice = action
+                                                trials[-1]["stepOneChoice"] = action
+                                            elif action[0] == 'p':
+                                                second_stage_choice = action
+                                                trials[-1]["stepTwoChoice"] = action
+                                            obs, reward, done = model.environment.step(action)
+                                            first_stage_count[first_stage_choice] += 1
 
-                            score = Helper.compare_trials(user_trials, trials)
+                                        transition_count[f"{first_stage_choice}-g"] += 1 if second_stage_choice[:-1] == 'g' else 0
+                                        transition_count[f"{first_stage_choice}-p"] += 1 if second_stage_choice[:-1] == 'p' else 0
+                                        model.update(first_stage_choice, second_stage_choice, reward)
+                                    model.update_transition_probabilities(transition_count, first_stage_count)
+
+                            score = Helper.compare_trials(user_trials, trials) if modeltype == TDLR else Helper.compare_trials(user_trials * episodes, trials)
                             if score > max:
                                 max = score
                                 config = f"Alpha: {alpha}, Gamma: {gamma}, Temperature: {temperature}"
@@ -147,4 +168,4 @@ if __name__ == '__main__':
                             # print(compare_trials(tim_trials, trials)
 
 
-    run_parameter_fitting()
+    run_parameter_fitting_tdlr()
