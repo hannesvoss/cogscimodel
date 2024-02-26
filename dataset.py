@@ -4,10 +4,11 @@ from helper import Helper
 
 
 class Dataset:
+    """
+    This class is a dataset for the two-step task.
+    """
     def __init__(self, filename):
         self._trials = []
-        self._step = 0
-        self._lastObservation = []
         with open(filename) as csv_file:
             reader = csv.DictReader(csv_file)
             for line in reader:

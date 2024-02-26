@@ -5,7 +5,8 @@ import numpy as np
 
 class Helper:
     @staticmethod
-    def format_obs_static(step, obs):
+    def format_obs(step, obs):
+        # prepend color to token index (g for first step, p for second step)
         if obs is None:
             return None
         step_color = ["g", "p"]
@@ -44,9 +45,9 @@ class Helper:
                 trial_choices = {k: Helper.parse_string_to_list(line[k]) for k in ('stepOneChoice', 'stepTwoChoice')}
                 for step_string, choice in trial_choices.items():
                     if 'One' in step_string:
-                        trial_choices[step_string] = Helper.format_obs_static(0, choice)
+                        trial_choices[step_string] = Helper.format_obs(0, choice)
                     elif 'Two' in step_string:
-                        trial_choices[step_string] = Helper.format_obs_static(1, choice)
+                        trial_choices[step_string] = Helper.format_obs(1, choice)
                 trials.append(trial_choices)
         return trials
 
@@ -54,3 +55,23 @@ class Helper:
     def softmax(x, temperature):  # could be unstable if temperature is too low (1e-3)
         x = np.array(x)
         return np.exp(x / temperature) / np.exp(x / temperature).sum()
+
+    @staticmethod
+    def is_first_choice(choice):
+        # checks if the choice is a valid first choice
+        return choice in ['g0', 'g1']
+
+    @staticmethod
+    def is_second_choice(choice):
+        # checks if the choice is a valid second choice
+        return choice in ['p0', 'p1', 'p2', 'p3']
+
+    @staticmethod
+    def is_pink_choice(choice):
+        # checks if the choice is a valid pink choice
+        return choice in ['p0', 'p1']
+
+    @staticmethod
+    def is_blue_choice(choice):
+        # checks if the choice is a valid blue choice
+        return choice in ['p2', 'p3']
